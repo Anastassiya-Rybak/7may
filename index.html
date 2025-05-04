@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Игра ко Дню Победы</title>
+  <style>
+    body {
+      margin: 0 auto;
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a1a url('https://i.imgur.com/qH4N7TZ.png') repeat;
+      color: #fff;
+      text-align: center;
+      box-sizing: border-box;
+      max-width: 1440px;
+    }
+
+    h1 {
+      margin-top: 30vh;
+      font-size: 3em;
+      color: #ffd700;
+      text-shadow: 2px 2px 4px #000;
+    }
+
+    .circle-container {
+      margin-top: 3vh;
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      transition: all 1s;
+    }
+
+    .team-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      row-gap: 2vh;
+    }
+
+    .circle {
+      border-radius: 50%;
+      background: #444;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      flex-direction: column;
+      font-size: 14px;
+      cursor: pointer;
+      border: 4px solid #ffd700;
+    }
+
+    .circle-start {
+      width: 150px;
+      height: 150px;
+    }
+
+    .circle img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+    }
+
+    .team-name {
+      font-size: 1.5em;
+      color: #ffd700;
+    }
+
+    .circle-container input {
+      width: 120px;
+      text-align: center;
+      font-size: 1.2em;
+    }
+
+    #startBtn {
+      margin-top: 5vh;
+      padding: 0.5em 3em;
+      font-size: 1.8em;
+      border-radius: 1em;
+      border: none;
+      background-color: #c11;
+      color: white;
+      cursor: pointer;
+    }
+
+    #startBtn:hover {
+      background-color: #a00;
+    }
+
+    .puzzle-section {
+      opacity: 0;
+      transition: opacity 1s;
+      text-align: center;
+      margin: 5vh auto;
+      width: 50%;
+    }
+
+    .puzzle-section img {
+      max-width: 800px;
+      width: 60%;
+      margin-bottom: 3vh;
+      border: 5px solid #fff;
+    }
+
+    .answer {
+      opacity: 0;
+      font-size: 3em;
+      text-transform: uppercase;
+      color: #0f0;
+      transition: opacity 0.5s;
+    }
+
+    .score {
+      font-weight: bold;
+      font-size: 1.5em;
+      margin-top: 1vh;
+      color: #ffd700;
+    }
+
+    .results {
+      width: 50%;
+      margin: auto;
+      margin-top: 5vh;
+    }
+
+    #firework-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .firework {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: red;
+      pointer-events: none;
+      animation: explode 700ms ease-out forwards;
+    }
+
+    @keyframes explode {
+      to {
+        transform: translate(var(--x), var(--y)) scale(0.2);
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<h1 id="title">ПРЕДСТАВЬТЕСЬ</h1>
+
+<div class="circle-container" id="circleContainer">
+  <div class="team-card">
+    <div class="circle circle-start" data-id="team1"><span>1</span></div>
+    <input type="text" data-id="team1">
+    <span></span>
+  </div>
+  <div class="team-card">
+    <div class="circle circle-start" data-id="team2"><span>2</span></div>
+    <input type="text" data-id="team2">
+    <span></span>
+  </div>
+  <div class="team-card">
+    <div class="circle circle-start" data-id="team3"><span>3</span></div>
+    <input type="text" data-id="team3">
+    <span></span>
+  </div>
+  <div class="team-card">
+    <div class="circle circle-start" data-id="team4"><span>4</span></div>
+    <input type="text" data-id="team4">
+    <span></span>
+  </div>
+</div>
+
+<button id="startBtn">НАЧАТЬ</button>
+
+<div class="puzzle-section" id="puzzleSection">
+  <img id="puzzleImage" src="" alt="Загадка">
+  <div id="answerText" class="answer">Это правильный ответ</div>
+</div>
+
+<div id="firework-container"></div>
+
+<script>
+  const teams = {
+    team1: { name: "", score: 0 },
+    team2: { name: "", score: 0 },
+    team3: { name: "", score: 0 },
+    team4: { name: "", score: 0 }
+  };
+
+  // список 50 уникальных изображений
+  const availableImages = Array.from({ length: 6 }, (_, i) => `images/${i + 1}.png`);
+
+  function getUniqueRandomImage() {
+    const index = Math.floor(Math.random() * availableImages.length);
+    const selected = availableImages[index];
+    availableImages.splice(index, 1);
+    return selected;
+  }
+
+  const puzzleAnswers = ['Окоп', 'Вечный огонь', 'Победа', 'Мина', 'Автомат', 'Герой', 'Полк', 'Марш'];
+  let currentPuzzle = 0;
+
+  const circleContainer = document.getElementById("circleContainer");
+  const circles = document.querySelectorAll(".circle");
+  const startBtn = document.getElementById("startBtn");
+  const puzzleSection = document.getElementById("puzzleSection");
+  const puzzleImage = document.getElementById("puzzleImage");
+  const answerText = document.getElementById("answerText");
+
+  circleContainer.addEventListener("keydown", async e => {
+    if (e.key === "Enter") {
+      const input = e.target;
+      const id = input.dataset.id;
+      const name = input.value.trim();
+      if (name) {
+        teams[id].name = name;
+        const span = document.createElement("div");
+        span.className = "team-name";
+        span.textContent = name;
+        input.replaceWith(span);
+
+        const circle = document.querySelector(`.circle[data-id="${id}"]`);
+        const img = document.createElement("img");
+        img.src = getUniqueRandomImage();
+        circle.innerHTML = "";
+        circle.appendChild(img);
+      }
+    }
+  });
+
+  startBtn.addEventListener("click", () => {
+    document.getElementById("title").style.display = "none";
+    startBtn.style.display = "none";
+    showPuzzle();
+  });
+
+  function showPuzzle() {
+    if (currentPuzzle >= 10) {
+      showResults();
+      return;
+    }
+    answerText.style.opacity = 0;
+    puzzleImage.src = `${currentPuzzle + 1}.png`;
+    answerText.textContent = puzzleAnswers[currentPuzzle];
+    puzzleSection.style.opacity = 1;
+  }
+
+  circles.forEach(circle => {
+    circle.addEventListener("click", () => {
+      const id = circle.dataset.id;
+      teams[id].score += 5;
+      answerText.style.opacity = 1;
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => launchFirework(circle), i * 400); // 3 салюта, каждые 400 мс
+      }    
+    });
+  });
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Enter" && answerText.style.opacity == "1") {
+      answerText.style.opacity = "0";
+      currentPuzzle++;
+      showPuzzle();
+    }
+  });
+
+  function showResults() {
+    puzzleSection.style.display = "none";
+    circleContainer.classList.add("results");
+    Array.from(circleContainer.children).forEach((card, i) => {
+      const id = "team" + (i + 1);
+      const div = card.querySelector("span:last-of-type");
+      div.className = "score";
+      div.textContent = `${teams[id].score} баллов`;
+    });
+  }
+
+  function launchFirework(circle) {
+    const rect = circle.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    const container = document.getElementById("firework-container");
+
+    for (let i = 0; i < 20; i++) {
+      const particle = document.createElement("div");
+      particle.className = "firework";
+
+      const angle = Math.random() * 2 * Math.PI;
+      const distance = 100 + Math.random() * 50;
+      const x = Math.cos(angle) * distance + "px";
+      const y = Math.sin(angle) * distance + "px";
+
+      particle.style.left = centerX + "px";
+      particle.style.top = centerY + "px";
+      particle.style.setProperty("--x", x);
+      particle.style.setProperty("--y", y);
+
+      particle.style.backgroundColor = getRandomColor();
+
+      container.appendChild(particle);
+
+      setTimeout(() => {
+        particle.remove();
+      }, 700);
+    }
+  }
+
+  function getRandomColor() {
+    const colors = ["#ff0", "#f00", "#0f0", "#0ff", "#f0f", "#fff"];
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+</script>
+
+</body>
+</html>
