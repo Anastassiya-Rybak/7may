@@ -112,15 +112,18 @@
 
     .score {
       font-weight: bold;
-      font-size: 1.5em;
+      font-size: 2em;
       margin-top: 1vh;
-      color: #ffd700;
+      color: #60cf4a;
     }
 
     .results {
-      width: 50%;
-      margin: auto;
-      margin-top: 5vh;
+      width: 60%;
+      margin: 30vh auto;
+
+      display: flex;
+      justify-content: space-evenly;
+      transition: all 1s;
     }
 
     #firework-container {
@@ -273,6 +276,7 @@
 
   function showResults() {
     puzzleSection.style.display = "none";
+    circleContainer.classList.remove("circle-container");
     circleContainer.classList.add("results");
     Array.from(circleContainer.children).forEach((card, i) => {
       const id = "team" + (i + 1);
