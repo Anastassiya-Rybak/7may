@@ -50,8 +50,14 @@
     }
 
     .circle-start {
+      width: 200px;
+      height: 200px;
+    }
+
+    .circle-main {
       width: 150px;
       height: 150px;
+      transition: all 1s;
     }
 
     .circle img {
@@ -62,7 +68,7 @@
     }
 
     .team-name {
-      font-size: 1.5em;
+      font-size: 2em;
       color: #ffd700;
     }
 
@@ -107,7 +113,6 @@
       font-size: 3em;
       text-transform: uppercase;
       color: #0f0;
-      transition: opacity 0.5s;
     }
 
     .score {
@@ -119,7 +124,7 @@
 
     .results {
       width: 60%;
-      margin: 30vh auto;
+      margin: 30vh auto 10vh;
 
       display: flex;
       justify-content: space-evenly;
@@ -150,6 +155,21 @@
         transform: translate(var(--x), var(--y)) scale(0.2);
         opacity: 0;
       }
+    }
+
+    @keyframes flash {
+      0%   { color: transparent; color: rgb(189, 21, 21); }
+      50%  { color: rgb(255, 56, 6); color: #000; }
+      100% { color: transparent; color: rgb(255, 170, 41); }
+    }
+
+    .flash-effect {
+      animation: flash 1s ease;
+    }
+
+    .circle.flash-ring {
+      box-shadow: 0 0 1em 0.5em rgb(252, 151, 20), 0 0 1em 0.5em #e62806f6;
+      transition: box-shadow 0.2s ease-in-out;
     }
   </style>
 </head>
@@ -187,7 +207,13 @@
   <div id="answerText" class="answer">Это правильный ответ</div>
 </div>
 
+<div style="font-size: 10em; color: rgb(248, 248, 248);">
+  <span id="timer" style="display: none;">00:00:00</span>
+</div>
+
 <div id="firework-container"></div>
+
+<audio id="whistle-sound" src="svistok-trenera.mp3"></audio>
 
 <script>
   const teams = {
@@ -241,13 +267,20 @@
   startBtn.addEventListener("click", () => {
     document.getElementById("title").style.display = "none";
     startBtn.style.display = "none";
-    showPuzzle();
+    if (currentPuzzle) {
+      startTimer(); // ⏱️ запускаем таймер     
+    } else {
+      showPuzzle();
+    }
   });
 
   function showPuzzle() {
-    if (currentPuzzle >= 10) {
+    if (currentPuzzle >= 8) {
       showResults();
       return;
+    }
+    for (const element of circles) {
+      element.classList.replace('circle-start', 'circle-main');
     }
     answerText.style.opacity = 0;
     puzzleImage.src = `${currentPuzzle + 1}.png`;
@@ -284,6 +317,12 @@
       div.className = "score";
       div.textContent = `${teams[id].score} секунд`;
     });
+    startBtn.style.display = "flex";
+
+    for (const element of circles) {
+      element.classList.replace('circle-main', 'circle-start');
+    }
+
   }
 
   function launchFirework(circle) {
@@ -321,6 +360,109 @@
     const colors = ["#ff0", "#f00", "#0f0", "#0ff", "#f0f", "#fff"];
     return colors[Math.floor(Math.random() * colors.length)];
   }
+
+function formatTime(seconds) {
+  const hrs = String(Math.floor(seconds / 3600)).padStart(2, '0');
+  const mins = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+  const secs = String(seconds % 60).padStart(2, '0');
+  return `${hrs}:${mins}:${secs}`;
+}
+
+let timerSeconds = 0;
+let timerInterval = null;
+let orderedGroups = [];
+let thresholds = []; // массив объектов: { score: число, ids: [строки], delay: секунд }
+let thresholdIndex = 0;
+
+function formatTime(seconds) {
+  const hrs = String(Math.floor(seconds / 3600)).padStart(2, '0');
+  const mins = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+  const secs = String(seconds % 60).padStart(2, '0');
+  return `${hrs}:${mins}:${secs}`;
+}
+
+function startTimer() {
+  const timerDisplay = document.getElementById("timer");
+  const whistle = document.getElementById("whistle-sound");
+
+  timerDisplay.style.display = 'block';
+
+  // Упорядочим команды по убыванию score
+  orderedGroups = Object.entries(teams).sort((a, b) => b[1].score - a[1].score);
+
+ // 2. Построим массив thresholds (score → id-шники, и delay на появление)
+ thresholds = [];
+  const seenScores = new Set();
+  for (const [id, team] of orderedGroups) {
+    if (!seenScores.has(team.score)) {
+      seenScores.add(team.score);
+      thresholds.push({ score: team.score, ids: [id] });
+    } else {
+      thresholds.find(t => t.score === team.score).ids.push(id);
+    }
+  }
+
+  // 3. Рассчитываем накопленные задержки
+  for (let i = 0; i < thresholds.length; i++) {
+    if (i === 0) {
+      thresholds[i].delay = 0;
+    } else {
+      thresholds[i].delay =
+        thresholds[i - 1].delay + thresholds[i - 1].score;
+    }
+  }
+
+  // 4. Подсветка сразу первой группы
+  applyHighlight(thresholds[0].ids);
+  thresholdIndex = 1;
+
+  // 5. Запускаем таймер
+  timerInterval = setInterval(() => {
+    timerSeconds++;
+    timerDisplay.textContent = formatTime(timerSeconds);
+
+    if (
+      thresholdIndex < thresholds.length &&
+      timerSeconds === thresholds[thresholdIndex].delay
+    ) {
+      const group = thresholds[thresholdIndex];
+      applyHighlight(group.ids);
+
+      whistle.play();
+      timerDisplay.classList.add("flash-effect");
+      setTimeout(() => {
+        timerDisplay.classList.remove("flash-effect");
+      }, 1000);
+
+      thresholdIndex++;
+    }
+  }, 1000);
+
+  document.addEventListener("keydown", stopTimerOnEnter);
+}
+
+function stopTimerOnEnter(e) {
+  if (e.key === "Enter") {
+    clearInterval(timerInterval);
+    document.removeEventListener("keydown", stopTimerOnEnter);
+    console.log("⏱️ Таймер остановлен по Enter");
+  }
+}
+
+function applyHighlight(ids) {
+  for (const id of ids) {
+    const circle = document.querySelector(`.circle[data-id="${id}"]`);
+    circle.classList.add("flash-ring");
+  }
+}
+
+function formatTime(seconds) {
+  const hrs = String(Math.floor(seconds / 3600)).padStart(2, '0');
+  const mins = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+  const secs = String(seconds % 60).padStart(2, '0');
+  return `${hrs}:${mins}:${secs}`;
+}
+
 </script>
 
 </body>
